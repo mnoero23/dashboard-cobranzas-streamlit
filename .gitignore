@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.py[cod]
+streamlit.out.log
+streamlit.err.log
+run_streamlit_background.py

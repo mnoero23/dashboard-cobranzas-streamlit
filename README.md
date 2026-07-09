@@ -1,7 +1,8 @@
-[README.md](https://github.com/user-attachments/files/29777776/README.md)
 # Dashboard de Cobranzas y Facturación para PyMEs
 
-Aplicación web interactiva desarrollada con Python y Streamlit para analizar facturación, cobranzas, deuda pendiente y facturas críticas de una PyME.
+App publicada: https://dashboard-cobranzas.streamlit.app/
+
+Aplicación web interactiva desarrollada con Python, Streamlit, pandas y Plotly para analizar facturación, cobranzas, deuda pendiente y facturas críticas de una PyME.
 
 > Caso de portfolio con dataset simulado. No utiliza datos reales ni referencias a empresas reales.
 
@@ -22,14 +23,24 @@ Muchas PyMEs gestionan facturas, pagos y deuda pendiente en planillas dispersas.
 
 ## Solución desarrollada
 
-La app lee un archivo Excel simulado, normaliza columnas, valida datos y presenta un tablero interactivo con filtros, KPIs, visualizaciones y una tabla de gestión de facturas críticas.
+La app lee un archivo Excel simulado, normaliza columnas, valida datos y presenta un tablero ejecutivo con filtros, KPIs dinámicos, visualizaciones interactivas y una tabla de gestión de facturas críticas.
+
+La segunda iteración incorpora:
+
+- Filtros interactivos por período, cliente, moneda y estado.
+- Botones de selección para moneda y estado cuando la versión de Streamlit lo permite.
+- Selección en gráficos para filtrar el dashboard por cliente, estado, moneda o mes.
+- KPIs dinámicos recalculados con los filtros manuales y los filtros generados por gráficos.
+- Tabla de facturas críticas recalculada con todos los filtros.
+- Descarga de la tabla filtrada como CSV.
+- Diseño visual más sobrio, profesional y orientado a dashboard ejecutivo.
 
 ## Herramientas usadas
 
 - Python
 - Streamlit
 - pandas
-- Plotly Express / Plotly Graph Objects
+- Plotly Express
 - openpyxl
 
 ## Estructura del proyecto
@@ -61,16 +72,25 @@ La app intenta leer una hoja llamada `Facturas`. Si no existe, busca una tabla l
 - Saldo vencido ARS equivalente
 - Facturas vencidas
 - Saldo pendiente USD
-- Cantidad de facturas
-- Clientes con deuda
 
 ## Visualizaciones incluidas
 
-- Evolución mensual de facturación y cobranza
-- Clientes con mayor deuda pendiente
-- Estado general de cobranzas
-- Exposición de deuda por moneda
-- Tabla de facturas críticas para gestionar
+- Evolución mensual de facturación y cobranza.
+- Clientes con mayor deuda pendiente.
+- Estado general de cobranzas.
+- Exposición de deuda por moneda.
+- Tabla de facturas críticas para gestionar.
+
+## Interactividad
+
+Los gráficos usan selección interactiva de Plotly en Streamlit. Al seleccionar elementos, el dashboard puede aplicar filtros cruzados:
+
+- Cliente seleccionado desde el gráfico de deuda por cliente.
+- Estado seleccionado desde el gráfico de estado general.
+- Moneda seleccionada desde el gráfico de exposición por moneda.
+- Mes seleccionado desde la evolución mensual.
+
+La app muestra los filtros activos por interacción y permite limpiar solo las selecciones de gráficos o todos los filtros.
 
 ## Cómo ejecutar localmente
 
