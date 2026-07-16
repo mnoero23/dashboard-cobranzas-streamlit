@@ -201,7 +201,8 @@ st.markdown(
         border-radius: 8px;
         padding: 0.95rem 1rem;
         box-shadow: var(--shadow);
-        min-height: 112px;
+        min-height: 124px;
+        height: 100%;
     }
 
     [data-testid="stMetricLabel"] {
@@ -211,8 +212,9 @@ st.markdown(
 
     [data-testid="stMetricValue"] {
         color: var(--text);
-        font-size: 1.55rem;
+        font-size: 1.42rem;
         font-weight: 750;
+        line-height: 1.16;
     }
 
     div[data-testid="stPlotlyChart"] {
@@ -1042,18 +1044,21 @@ def render_clients_tab(df: pd.DataFrame) -> None:
         st.info("No hay clientes para mostrar con los filtros seleccionados.", icon=":material/info:")
         return
 
-    total_clients = summary["cliente"].nunique()
     clients_with_debt = int((summary["saldo_pendiente_ars"] > 0).sum())
     top_client = summary.iloc[0]
-    metrics = st.columns(4, gap="medium")
-    metrics[0].metric("Clientes filtrados", format_count(total_clients), border=True)
-    metrics[1].metric("Clientes con deuda", format_count(clients_with_debt), border=True)
-    metrics[2].metric("Mayor saldo", top_client["cliente"], format_ars(top_client["saldo_pendiente_ars"]), border=True)
-    metrics[3].metric("Deuda vencida", format_ars(summary["saldo_vencido_ars"].sum()), border=True)
+    metrics = st.columns(3, gap="medium")
+    metrics[0].metric("Clientes con deuda", format_count(clients_with_debt), border=True)
+    metrics[1].metric(
+        "Mayor saldo",
+        top_client["cliente"],
+        format_ars(top_client["saldo_pendiente_ars"]),
+        border=True,
+    )
+    metrics[2].metric("Deuda vencida", format_ars(summary["saldo_vencido_ars"].sum()), border=True)
 
-    left, right = st.columns([0.55, 0.45], gap="medium")
+    left, right = st.columns([0.54, 0.46], gap="medium")
     with left:
-        ranked = summary.head(12).sort_values("saldo_pendiente_ars", ascending=True)
+        ranked = summary.head(8).sort_values("saldo_pendiente_ars", ascending=True)
         fig = px.bar(
             ranked,
             y="cliente",
@@ -1076,39 +1081,29 @@ def render_clients_tab(df: pd.DataFrame) -> None:
             )
         )
         fig.update_xaxes(tickprefix="$ ", tickformat=",.0f")
-        st.plotly_chart(style_plot(fig, height=380), config=CHART_CONFIG, width="stretch")
+        fig.update_yaxes(tickfont=dict(size=11), automargin=True)
+        st.plotly_chart(style_plot(fig, height=320), config=CHART_CONFIG, width="stretch")
 
     with right:
         table = summary.copy()
         table["participacion_deuda"] = table["participacion_deuda"].map(lambda value: f"{value:.1%}")
         st.dataframe(
-            table[
-                [
-                    "cliente",
-                    "facturas",
-                    "facturas_abiertas",
-                    "facturas_vencidas",
-                    "saldo_pendiente_ars",
-                    "saldo_vencido_ars",
-                    "participacion_deuda",
-                ]
-            ],
+            table[["cliente", "facturas_vencidas", "saldo_pendiente_ars", "participacion_deuda"]],
             hide_index=True,
+            height=320,
             width="stretch",
             column_config={
-                "cliente": st.column_config.TextColumn("Cliente", pinned=True),
-                "facturas": st.column_config.NumberColumn("Facturas", format="%d"),
-                "facturas_abiertas": st.column_config.NumberColumn("Abiertas", format="%d"),
-                "facturas_vencidas": st.column_config.NumberColumn("Vencidas", format="%d"),
-                "saldo_pendiente_ars": st.column_config.NumberColumn("Saldo ARS Eq", format="$ %.0f"),
-                "saldo_vencido_ars": st.column_config.NumberColumn("Vencido ARS Eq", format="$ %.0f"),
-                "participacion_deuda": st.column_config.TextColumn("% deuda"),
+                "cliente": st.column_config.TextColumn("Cliente", width="medium"),
+                "facturas_vencidas": st.column_config.NumberColumn("Vencidas", format="%d", width="small"),
+                "saldo_pendiente_ars": st.column_config.NumberColumn("Saldo", format="$ %.0f", width="small"),
+                "participacion_deuda": st.column_config.TextColumn("% deuda", width="small"),
             },
         )
 
+    client_options = sorted(summary["cliente"].tolist(), key=str.casefold)
     selected_client = st.selectbox(
         "Analizar cliente",
-        summary["cliente"].tolist(),
+        client_options,
         index=0,
         placeholder="Seleccioná un cliente",
     )
