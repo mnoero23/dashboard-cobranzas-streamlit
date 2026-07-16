@@ -31,6 +31,8 @@ La segunda iteración incorpora:
 - Botones de selección para moneda y estado cuando la versión de Streamlit lo permite.
 - Selección en gráficos para filtrar el dashboard por cliente, estado, moneda o mes.
 - KPIs dinámicos recalculados con los filtros manuales y los filtros generados por gráficos.
+- Navegación por pestañas: Resumen, Clientes, Facturas críticas y Proyecto.
+- Pestaña Clientes con ranking de deuda, concentración, vencimientos y detalle descargable por cliente.
 - Tabla de facturas críticas recalculada con todos los filtros.
 - Descarga de la tabla filtrada como CSV.
 - Diseño visual más sobrio, profesional y orientado a dashboard ejecutivo.
@@ -79,6 +81,7 @@ La app intenta leer una hoja llamada `Facturas`. Si no existe, busca una tabla l
 - Clientes con mayor deuda pendiente.
 - Estado general de cobranzas.
 - Exposición de deuda por moneda.
+- Vista de clientes con ranking, métricas de deuda vencida y perfil individual.
 - Tabla de facturas críticas para gestionar.
 
 ## Interactividad

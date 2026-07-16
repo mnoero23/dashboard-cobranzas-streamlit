@@ -921,6 +921,200 @@ def render_critical_invoices(df: pd.DataFrame) -> None:
     )
 
 
+def build_client_summary(df: pd.DataFrame) -> pd.DataFrame:
+    today = pd.Timestamp(date.today())
+    work_df = df.copy()
+    work_df["factura_vencida"] = (
+        (work_df["fecha_vencimiento"] < today) & (work_df["saldo_equivalente_ars"] > 0)
+    )
+    work_df["cobrada"] = work_df["estado"].str.casefold().eq("cobrada")
+    work_df["saldo_vencido_cliente_ars"] = work_df["saldo_equivalente_ars"].where(
+        work_df["factura_vencida"], 0
+    )
+
+    summary = (
+        work_df.groupby("cliente", as_index=False)
+        .agg(
+            facturas=("id_factura", "count"),
+            total_facturado_ars=("importe_equivalente_ars", "sum"),
+            total_cobrado_ars=("importe_cobrado", "sum"),
+            saldo_pendiente_ars=("saldo_equivalente_ars", "sum"),
+            saldo_vencido_ars=("saldo_vencido_cliente_ars", "sum"),
+            facturas_vencidas=("factura_vencida", "sum"),
+            facturas_abiertas=("cobrada", lambda values: int((~values).sum())),
+            promedio_dias_atraso=("dias_atraso", "mean"),
+        )
+        .sort_values("saldo_pendiente_ars", ascending=False)
+    )
+    summary["participacion_deuda"] = 0.0
+    total_debt = summary["saldo_pendiente_ars"].sum()
+    if total_debt > 0:
+        summary["participacion_deuda"] = summary["saldo_pendiente_ars"] / total_debt
+    return summary
+
+
+def render_client_profile(df: pd.DataFrame, client_name: str) -> None:
+    client_df = df[df["cliente"].eq(client_name)].copy()
+    if client_df.empty:
+        st.info("No hay datos para el cliente seleccionado.", icon=":material/info:")
+        return
+
+    kpis = build_kpis(client_df)
+    client_type = client_df["tipo_cliente"].dropna().astype(str)
+    payment_profile = client_df["perfil_pago"].dropna().astype(str)
+    next_actions = (
+        client_df.loc[client_df["saldo_equivalente_ars"] > 0, "proxima_accion"]
+        .dropna()
+        .astype(str)
+        .value_counts()
+    )
+
+    st.markdown(f'<div class="section-title">Perfil de {client_name}</div>', unsafe_allow_html=True)
+    cols = st.columns(4, gap="medium")
+    cols[0].metric("Saldo pendiente", format_ars(kpis["saldo_pendiente_ars"]), border=True)
+    cols[1].metric("Saldo vencido", format_ars(kpis["saldo_vencido_ars"]), border=True)
+    cols[2].metric("Facturas vencidas", format_count(kpis["facturas_vencidas"]), border=True)
+    cols[3].metric("Facturas totales", format_count(len(client_df)), border=True)
+
+    info_cols = st.columns(3, gap="medium")
+    info_cols[0].caption("Tipo de cliente")
+    info_cols[0].write(client_type.mode().iat[0] if not client_type.empty else "Sin dato")
+    info_cols[1].caption("Perfil de pago")
+    info_cols[1].write(payment_profile.mode().iat[0] if not payment_profile.empty else "Sin dato")
+    info_cols[2].caption("Próxima acción dominante")
+    info_cols[2].write(next_actions.index[0] if not next_actions.empty else "Sin acción pendiente")
+
+    detail_columns = [
+        "id_factura",
+        "fecha_emision",
+        "fecha_vencimiento",
+        "moneda",
+        "importe_facturado",
+        "saldo_pendiente",
+        "saldo_equivalente_ars",
+        "dias_atraso",
+        "estado",
+        "prioridad_cobranza",
+        "proxima_accion",
+    ]
+    detail = client_df[detail_columns].sort_values(
+        ["saldo_equivalente_ars", "dias_atraso"], ascending=[False, False]
+    )
+    display_detail = detail.copy()
+    for column in ["fecha_emision", "fecha_vencimiento"]:
+        display_detail[column] = display_detail[column].dt.strftime("%d/%m/%Y")
+
+    st.dataframe(
+        display_detail,
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "id_factura": st.column_config.TextColumn("Factura", pinned=True),
+            "fecha_emision": st.column_config.TextColumn("Emisión"),
+            "fecha_vencimiento": st.column_config.TextColumn("Vencimiento"),
+            "moneda": st.column_config.TextColumn("Moneda"),
+            "importe_facturado": st.column_config.NumberColumn("Facturado", format="$ %.0f"),
+            "saldo_pendiente": st.column_config.NumberColumn("Saldo origen", format="$ %.0f"),
+            "saldo_equivalente_ars": st.column_config.NumberColumn("Saldo ARS Eq", format="$ %.0f"),
+            "dias_atraso": st.column_config.NumberColumn("Días atraso", format="%d"),
+            "estado": st.column_config.TextColumn("Estado"),
+            "prioridad_cobranza": st.column_config.TextColumn("Prioridad"),
+            "proxima_accion": st.column_config.TextColumn("Próxima acción"),
+        },
+    )
+
+    st.download_button(
+        "Descargar facturas del cliente",
+        data=detail.to_csv(index=False).encode("utf-8-sig"),
+        file_name=f"facturas_{normalize_name(client_name)}.csv",
+        mime="text/csv",
+        icon=":material/download:",
+        width="content",
+    )
+
+
+def render_clients_tab(df: pd.DataFrame) -> None:
+    st.markdown('<div class="section-title">Clientes</div>', unsafe_allow_html=True)
+    st.caption("Vista enfocada en concentración de deuda, vencimientos y seguimiento por cliente.")
+
+    summary = build_client_summary(df)
+    if summary.empty:
+        st.info("No hay clientes para mostrar con los filtros seleccionados.", icon=":material/info:")
+        return
+
+    total_clients = summary["cliente"].nunique()
+    clients_with_debt = int((summary["saldo_pendiente_ars"] > 0).sum())
+    top_client = summary.iloc[0]
+    metrics = st.columns(4, gap="medium")
+    metrics[0].metric("Clientes filtrados", format_count(total_clients), border=True)
+    metrics[1].metric("Clientes con deuda", format_count(clients_with_debt), border=True)
+    metrics[2].metric("Mayor saldo", top_client["cliente"], format_ars(top_client["saldo_pendiente_ars"]), border=True)
+    metrics[3].metric("Deuda vencida", format_ars(summary["saldo_vencido_ars"].sum()), border=True)
+
+    left, right = st.columns([0.55, 0.45], gap="medium")
+    with left:
+        ranked = summary.head(12).sort_values("saldo_pendiente_ars", ascending=True)
+        fig = px.bar(
+            ranked,
+            y="cliente",
+            x="saldo_pendiente_ars",
+            orientation="h",
+            color="facturas_vencidas",
+            labels={
+                "cliente": "",
+                "saldo_pendiente_ars": "Saldo pendiente ARS Eq",
+                "facturas_vencidas": "Vencidas",
+            },
+            custom_data=["cliente", "saldo_pendiente_ars", "facturas_vencidas"],
+            color_continuous_scale=["#dbe8ee", "#a43f3f"],
+        )
+        fig.update_traces(
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Saldo pendiente: $ %{customdata[1]:,.0f}<br>"
+                "Facturas vencidas: %{customdata[2]:,.0f}<extra></extra>"
+            )
+        )
+        fig.update_xaxes(tickprefix="$ ", tickformat=",.0f")
+        st.plotly_chart(style_plot(fig, height=380), config=CHART_CONFIG, width="stretch")
+
+    with right:
+        table = summary.copy()
+        table["participacion_deuda"] = table["participacion_deuda"].map(lambda value: f"{value:.1%}")
+        st.dataframe(
+            table[
+                [
+                    "cliente",
+                    "facturas",
+                    "facturas_abiertas",
+                    "facturas_vencidas",
+                    "saldo_pendiente_ars",
+                    "saldo_vencido_ars",
+                    "participacion_deuda",
+                ]
+            ],
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "cliente": st.column_config.TextColumn("Cliente", pinned=True),
+                "facturas": st.column_config.NumberColumn("Facturas", format="%d"),
+                "facturas_abiertas": st.column_config.NumberColumn("Abiertas", format="%d"),
+                "facturas_vencidas": st.column_config.NumberColumn("Vencidas", format="%d"),
+                "saldo_pendiente_ars": st.column_config.NumberColumn("Saldo ARS Eq", format="$ %.0f"),
+                "saldo_vencido_ars": st.column_config.NumberColumn("Vencido ARS Eq", format="$ %.0f"),
+                "participacion_deuda": st.column_config.TextColumn("% deuda"),
+            },
+        )
+
+    selected_client = st.selectbox(
+        "Analizar cliente",
+        summary["cliente"].tolist(),
+        index=0,
+        placeholder="Seleccioná un cliente",
+    )
+    render_client_profile(df, selected_client)
+
+
 def render_project_note() -> None:
     st.markdown('<div class="section-title">Sobre este proyecto</div>', unsafe_allow_html=True)
     st.write(
@@ -975,11 +1169,23 @@ def main() -> None:
         st.info("No hay datos disponibles para los filtros seleccionados.", icon=":material/info:")
         st.stop()
 
-    kpis = build_kpis(filtered)
-    render_metrics(kpis)
-    render_charts(filtered)
-    render_critical_invoices(filtered)
-    render_project_note()
+    overview_tab, clients_tab, invoices_tab, about_tab = st.tabs(
+        ["Resumen", "Clientes", "Facturas críticas", "Proyecto"]
+    )
+
+    with overview_tab:
+        kpis = build_kpis(filtered)
+        render_metrics(kpis)
+        render_charts(filtered)
+
+    with clients_tab:
+        render_clients_tab(filtered)
+
+    with invoices_tab:
+        render_critical_invoices(filtered)
+
+    with about_tab:
+        render_project_note()
 
 
 if __name__ == "__main__":
