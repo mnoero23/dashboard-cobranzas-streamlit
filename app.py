@@ -1119,6 +1119,23 @@ def render_project_note() -> None:
         "críticos, exposición por moneda y acciones prioritarias de cobranza usando datos simulados."
     )
 
+    st.markdown("### Trabajar desde otra PC")
+    st.write("Con Git y Python instalados, abrí una terminal y seguí estos pasos:")
+    st.code(
+        "git clone <URL_DEL_REPOSITORIO>\n"
+        "cd dashboard-cobranzas-streamlit\n"
+        "python -m venv .venv\n"
+        "# Windows: .venv\\Scripts\\activate\n"
+        "# macOS/Linux: source .venv/bin/activate\n"
+        "pip install -r requirements.txt\n"
+        "streamlit run app.py",
+        language="bash",
+    )
+    st.caption(
+        "Si el proyecto ya está clonado en esa PC, ejecutá `git pull` antes de iniciar. "
+        "El archivo de datos debe permanecer en `data/dataset_cobranzas.xlsx`."
+    )
+
 
 def main() -> None:
     init_session_state()
