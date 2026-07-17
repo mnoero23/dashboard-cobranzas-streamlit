@@ -201,8 +201,8 @@ st.markdown(
         border-radius: 8px;
         padding: 0.95rem 1rem;
         box-shadow: var(--shadow);
-        min-height: 124px;
-        height: 100%;
+        height: 124px;
+        box-sizing: border-box;
     }
 
     [data-testid="stMetricLabel"] {
@@ -258,6 +258,12 @@ def format_ars(value: float | int | None) -> str:
 def format_usd(value: float | int | None) -> str:
     value = 0 if pd.isna(value) else float(value)
     return "US$ " + f"{value:,.0f}".replace(",", ".")
+
+
+def format_table_money(value: float | int | None, symbol: str = "$") -> str:
+    value = 0 if pd.isna(value) else float(value)
+    integer_part, decimal_part = f"{value:,.2f}".split(".")
+    return f"{symbol}{integer_part.replace(',', '.')},{decimal_part}"
 
 
 def format_count(value: float | int | None) -> str:
@@ -886,12 +892,14 @@ def render_critical_invoices(df: pd.DataFrame) -> None:
     display_df = critical.copy()
     display_df["fecha_vencimiento"] = display_df["fecha_vencimiento"].dt.strftime("%d/%m/%Y")
     display_df["saldo_pendiente"] = display_df.apply(
-        lambda row: format_usd(row["saldo_pendiente"])
+        lambda row: format_table_money(row["saldo_pendiente"], "US$")
         if str(row["moneda"]).upper() == "USD"
-        else format_ars(row["saldo_pendiente"]),
+        else format_table_money(row["saldo_pendiente"]),
         axis=1,
     )
-    display_df["saldo_equivalente_ars"] = display_df["saldo_equivalente_ars"].map(format_ars)
+    display_df["saldo_equivalente_ars"] = display_df["saldo_equivalente_ars"].map(
+        format_table_money
+    )
     display_df["dias_atraso"] = display_df["dias_atraso"].fillna(0).astype(int)
 
     st.dataframe(
@@ -1005,6 +1013,21 @@ def render_client_profile(df: pd.DataFrame, client_name: str) -> None:
     display_detail = detail.copy()
     for column in ["fecha_emision", "fecha_vencimiento"]:
         display_detail[column] = display_detail[column].dt.strftime("%d/%m/%Y")
+    display_detail["importe_facturado"] = display_detail.apply(
+        lambda row: format_table_money(
+            row["importe_facturado"], "US$" if str(row["moneda"]).upper() == "USD" else "$"
+        ),
+        axis=1,
+    )
+    display_detail["saldo_pendiente"] = display_detail.apply(
+        lambda row: format_table_money(
+            row["saldo_pendiente"], "US$" if str(row["moneda"]).upper() == "USD" else "$"
+        ),
+        axis=1,
+    )
+    display_detail["saldo_equivalente_ars"] = display_detail["saldo_equivalente_ars"].map(
+        format_table_money
+    )
 
     st.dataframe(
         display_detail,
@@ -1015,9 +1038,9 @@ def render_client_profile(df: pd.DataFrame, client_name: str) -> None:
             "fecha_emision": st.column_config.TextColumn("Emisión"),
             "fecha_vencimiento": st.column_config.TextColumn("Vencimiento"),
             "moneda": st.column_config.TextColumn("Moneda"),
-            "importe_facturado": st.column_config.NumberColumn("Facturado", format="$ %.0f"),
-            "saldo_pendiente": st.column_config.NumberColumn("Saldo origen", format="$ %.0f"),
-            "saldo_equivalente_ars": st.column_config.NumberColumn("Saldo ARS Eq", format="$ %.0f"),
+            "importe_facturado": st.column_config.TextColumn("Facturado"),
+            "saldo_pendiente": st.column_config.TextColumn("Saldo origen"),
+            "saldo_equivalente_ars": st.column_config.TextColumn("Saldo ARS Eq"),
             "dias_atraso": st.column_config.NumberColumn("Días atraso", format="%d"),
             "estado": st.column_config.TextColumn("Estado"),
             "prioridad_cobranza": st.column_config.TextColumn("Prioridad"),
@@ -1049,8 +1072,7 @@ def render_clients_tab(df: pd.DataFrame) -> None:
     metrics = st.columns(3, gap="medium")
     metrics[0].metric("Clientes con deuda", format_count(clients_with_debt), border=True)
     metrics[1].metric(
-        "Mayor saldo",
-        top_client["cliente"],
+        f"Mayor saldo · {top_client['cliente']}",
         format_ars(top_client["saldo_pendiente_ars"]),
         border=True,
     )
@@ -1064,14 +1086,13 @@ def render_clients_tab(df: pd.DataFrame) -> None:
             y="cliente",
             x="saldo_pendiente_ars",
             orientation="h",
-            color="facturas_vencidas",
             labels={
                 "cliente": "",
                 "saldo_pendiente_ars": "Saldo pendiente ARS Eq",
                 "facturas_vencidas": "Vencidas",
             },
             custom_data=["cliente", "saldo_pendiente_ars", "facturas_vencidas"],
-            color_continuous_scale=["#dbe8ee", "#a43f3f"],
+            color_discrete_sequence=["#245b73"],
         )
         fig.update_traces(
             hovertemplate=(
@@ -1087,6 +1108,7 @@ def render_clients_tab(df: pd.DataFrame) -> None:
     with right:
         table = summary.copy()
         table["participacion_deuda"] = table["participacion_deuda"].map(lambda value: f"{value:.1%}")
+        table["saldo_pendiente_ars"] = table["saldo_pendiente_ars"].map(format_table_money)
         st.dataframe(
             table[["cliente", "facturas_vencidas", "saldo_pendiente_ars", "participacion_deuda"]],
             hide_index=True,
@@ -1095,7 +1117,7 @@ def render_clients_tab(df: pd.DataFrame) -> None:
             column_config={
                 "cliente": st.column_config.TextColumn("Cliente", width="medium"),
                 "facturas_vencidas": st.column_config.NumberColumn("Vencidas", format="%d", width="small"),
-                "saldo_pendiente_ars": st.column_config.NumberColumn("Saldo", format="$ %.0f", width="small"),
+                "saldo_pendiente_ars": st.column_config.TextColumn("Saldo", width="small"),
                 "participacion_deuda": st.column_config.TextColumn("% deuda", width="small"),
             },
         )
