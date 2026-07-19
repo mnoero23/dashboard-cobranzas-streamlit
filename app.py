@@ -114,7 +114,7 @@ st.markdown(
 
     .main .block-container {
         max-width: 1360px;
-        padding-top: 1.7rem;
+        padding-top: 0.85rem;
         padding-bottom: 2.8rem;
     }
 
@@ -122,15 +122,15 @@ st.markdown(
         background: linear-gradient(135deg, #ffffff 0%, #f5f8fb 100%);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 1.25rem 1.35rem 1.15rem;
+        padding: 0.85rem 1rem 0.9rem;
         box-shadow: var(--shadow);
-        margin-bottom: 1.1rem;
+        margin-bottom: 0.75rem;
     }
 
     .hero h1 {
-        margin: 0.25rem 0 0.35rem;
+        margin: 0.28rem 0 0.22rem;
         color: var(--text);
-        font-size: clamp(1.85rem, 2.5vw, 2.45rem);
+        font-size: clamp(1.55rem, 2vw, 2.05rem);
         line-height: 1.12;
         letter-spacing: 0;
     }
@@ -138,14 +138,7 @@ st.markdown(
     .hero p {
         margin: 0;
         color: var(--muted);
-        font-size: 1.02rem;
-    }
-
-    .badge-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.8rem;
+        font-size: 0.95rem;
     }
 
     .badge {
@@ -159,6 +152,34 @@ st.markdown(
         padding: 0.38rem 0.68rem;
         font-size: 0.88rem;
         font-weight: 650;
+    }
+
+    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+        gap: 0.45rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 0.8rem;
+    }
+
+    button[data-baseweb="tab"] {
+        border: 1px solid transparent;
+        border-radius: 8px 8px 0 0;
+        color: var(--muted);
+        font-weight: 750;
+        padding: 0.48rem 0.85rem;
+    }
+
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background: #ffffff;
+        border-color: var(--border);
+        border-bottom-color: #ffffff;
+        color: var(--accent);
+        box-shadow: 0 -2px 10px rgba(31, 41, 51, 0.04);
+    }
+
+    div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
+        background: var(--accent);
+        height: 3px;
+        border-radius: 999px;
     }
 
     .section-title {
@@ -230,6 +251,64 @@ st.markdown(
         border-radius: 8px;
         box-shadow: var(--shadow);
         background: var(--panel);
+    }
+
+    .client-summary-card,
+    .client-kpi-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        box-sizing: border-box;
+        height: 124px;
+        padding: 0.95rem 1rem;
+    }
+
+    .client-summary-label,
+    .client-kpi-label {
+        color: var(--muted);
+        font-size: 0.86rem;
+        font-weight: 750;
+        margin-bottom: 0.42rem;
+    }
+
+    .client-summary-value,
+    .client-kpi-value {
+        color: var(--text);
+        font-size: 1.35rem;
+        font-weight: 800;
+        line-height: 1.14;
+    }
+
+    .client-summary-note {
+        color: var(--muted);
+        font-size: 0.82rem;
+        margin-top: 0.35rem;
+        line-height: 1.2;
+    }
+
+    .client-separator {
+        border-top: 1px solid var(--border-strong);
+        margin: 1.15rem 0 0.9rem;
+    }
+
+    .client-analyze-title {
+        color: var(--text);
+        font-size: 1.18rem;
+        font-weight: 800;
+        margin-bottom: 0.35rem;
+    }
+
+    .value-green {
+        color: var(--success);
+    }
+
+    .value-orange {
+        color: var(--warning);
+    }
+
+    .value-red {
+        color: var(--danger);
     }
 
     .stDownloadButton button,
@@ -615,9 +694,32 @@ def render_header() -> None:
             <span class="badge">Dataset simulado · Caso de portfolio</span>
             <h1>{APP_TITLE}</h1>
             <p>{APP_SUBTITLE}</p>
-            <div class="badge-row">
-                <span class="badge">App interactiva desarrollada con Python, Streamlit, pandas y Plotly.</span>
-            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_client_summary_card(label: str, value: str, note: str = "", color_class: str = "") -> None:
+    note_html = f'<div class="client-summary-note">{note}</div>' if note else ""
+    st.markdown(
+        f"""
+        <div class="client-summary-card">
+            <div class="client-summary-label">{label}</div>
+            <div class="client-summary-value {color_class}">{value}</div>
+            {note_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_client_kpi_card(label: str, value: str, color_class: str = "") -> None:
+    st.markdown(
+        f"""
+        <div class="client-kpi-card">
+            <div class="client-kpi-label">{label}</div>
+            <div class="client-kpi-value {color_class}">{value}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -972,11 +1074,17 @@ def render_client_profile(df: pd.DataFrame, client_name: str) -> None:
     )
 
     st.markdown(f'<div class="section-title">Perfil de {client_name}</div>', unsafe_allow_html=True)
-    cols = st.columns(4, gap="medium")
-    cols[0].metric("Saldo pendiente", format_ars(kpis["saldo_pendiente_ars"]), border=True)
-    cols[1].metric("Saldo vencido", format_ars(kpis["saldo_vencido_ars"]), border=True)
-    cols[2].metric("Facturas vencidas", format_count(kpis["facturas_vencidas"]), border=True)
-    cols[3].metric("Facturas totales", format_count(len(client_df)), border=True)
+    cols = st.columns(5, gap="medium")
+    with cols[0]:
+        render_client_kpi_card("Total facturado", format_ars(kpis["total_facturado_ars"]), "value-green")
+    with cols[1]:
+        render_client_kpi_card("Saldo pendiente", format_ars(kpis["saldo_pendiente_ars"]), "value-orange")
+    with cols[2]:
+        render_client_kpi_card("Saldo vencido", format_ars(kpis["saldo_vencido_ars"]), "value-red")
+    with cols[3]:
+        render_client_kpi_card("Facturas vencidas", format_count(kpis["facturas_vencidas"]), "value-red")
+    with cols[4]:
+        render_client_kpi_card("Facturas totales", format_count(len(client_df)))
 
     info_cols = st.columns(3, gap="medium")
     info_cols[0].caption("Tipo de cliente")
@@ -1046,15 +1154,20 @@ def render_clients_tab(df: pd.DataFrame) -> None:
 
     clients_with_debt = int((summary["saldo_pendiente_ars"] > 0).sum())
     top_client = summary.iloc[0]
-    metrics = st.columns(3, gap="medium")
-    metrics[0].metric("Clientes con deuda", format_count(clients_with_debt), border=True)
-    metrics[1].metric(
-        "Mayor saldo",
-        top_client["cliente"],
-        format_ars(top_client["saldo_pendiente_ars"]),
-        border=True,
-    )
-    metrics[2].metric("Deuda vencida", format_ars(summary["saldo_vencido_ars"].sum()), border=True)
+    metrics = st.columns(4, gap="medium")
+    with metrics[0]:
+        render_client_summary_card("Clientes", format_count(summary["cliente"].nunique()))
+    with metrics[1]:
+        render_client_summary_card("Clientes con deuda", format_count(clients_with_debt))
+    with metrics[2]:
+        render_client_summary_card(
+            "Mayor saldo",
+            format_ars(top_client["saldo_pendiente_ars"]),
+            str(top_client["cliente"]),
+            "value-orange",
+        )
+    with metrics[3]:
+        render_client_summary_card("Deuda vencida", format_ars(summary["saldo_vencido_ars"].sum()), "", "value-red")
 
     left, right = st.columns([0.54, 0.46], gap="medium")
     with left:
@@ -1064,14 +1177,14 @@ def render_clients_tab(df: pd.DataFrame) -> None:
             y="cliente",
             x="saldo_pendiente_ars",
             orientation="h",
-            color="facturas_vencidas",
+            color="saldo_pendiente_ars",
             labels={
                 "cliente": "",
                 "saldo_pendiente_ars": "Saldo pendiente ARS Eq",
                 "facturas_vencidas": "Vencidas",
             },
             custom_data=["cliente", "saldo_pendiente_ars", "facturas_vencidas"],
-            color_continuous_scale=["#dbe8ee", "#a43f3f"],
+            color_continuous_scale=["#dce9ef", "#245b73"],
         )
         fig.update_traces(
             hovertemplate=(
@@ -1080,6 +1193,7 @@ def render_clients_tab(df: pd.DataFrame) -> None:
                 "Facturas vencidas: %{customdata[2]:,.0f}<extra></extra>"
             )
         )
+        fig.update_layout(coloraxis_showscale=False)
         fig.update_xaxes(tickprefix="$ ", tickformat=",.0f")
         fig.update_yaxes(tickfont=dict(size=11), automargin=True)
         st.plotly_chart(style_plot(fig, height=320), config=CHART_CONFIG, width="stretch")
@@ -1101,11 +1215,14 @@ def render_clients_tab(df: pd.DataFrame) -> None:
         )
 
     client_options = sorted(summary["cliente"].tolist(), key=str.casefold)
+    st.markdown('<div class="client-separator"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="client-analyze-title">Analizar cliente</div>', unsafe_allow_html=True)
     selected_client = st.selectbox(
         "Analizar cliente",
         client_options,
         index=0,
         placeholder="Seleccioná un cliente",
+        label_visibility="collapsed",
     )
     render_client_profile(df, selected_client)
 
