@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 import re
 import unicodedata
@@ -15,7 +15,6 @@ from openpyxl.utils.cell import range_boundaries
 APP_TITLE = "Dashboard de Cobranzas y Facturación para PyMEs"
 APP_SUBTITLE = "Seguimiento ejecutivo de facturación, cobranza, deuda pendiente y facturas críticas."
 DATA_PATH = Path("data") / "dataset_cobranzas.xlsx"
-UPDATE_LOG_PATH = Path("data") / "update_log.csv"
 
 EXPECTED_COLUMNS = [
     "id_factura",
@@ -162,21 +161,6 @@ st.markdown(
         font-weight: 650;
     }
 
-    .dataset-status {
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: #ffffff;
-        padding: 0.85rem 1rem;
-        margin: -0.35rem 0 1rem;
-        box-shadow: 0 3px 12px rgba(31, 41, 51, 0.04);
-        color: var(--muted);
-        font-size: 0.92rem;
-    }
-
-    .dataset-status strong {
-        color: var(--text);
-    }
-
     .section-title {
         margin: 1.15rem 0 0.45rem;
         color: var(--text);
@@ -217,8 +201,8 @@ st.markdown(
         border-radius: 8px;
         padding: 0.95rem 1rem;
         box-shadow: var(--shadow);
-        height: 124px;
-        box-sizing: border-box;
+        min-height: 124px;
+        height: 100%;
     }
 
     [data-testid="stMetricLabel"] {
@@ -274,12 +258,6 @@ def format_ars(value: float | int | None) -> str:
 def format_usd(value: float | int | None) -> str:
     value = 0 if pd.isna(value) else float(value)
     return "US$ " + f"{value:,.0f}".replace(",", ".")
-
-
-def format_table_money(value: float | int | None, symbol: str = "$") -> str:
-    value = 0 if pd.isna(value) else float(value)
-    integer_part, decimal_part = f"{value:,.2f}".split(".")
-    return f"{symbol}{integer_part.replace(',', '.')},{decimal_part}"
 
 
 def format_count(value: float | int | None) -> str:
@@ -646,61 +624,6 @@ def render_header() -> None:
     )
 
 
-def dataset_update_metadata(df: pd.DataFrame) -> dict[str, str]:
-    last_update: datetime | None = None
-    source = "fecha de modificación del Excel"
-
-    if UPDATE_LOG_PATH.exists():
-        try:
-            log_df = pd.read_csv(UPDATE_LOG_PATH)
-            if not log_df.empty and "fecha_hora_ejecucion" in log_df.columns:
-                ok_log = log_df
-                if "estado_ejecucion" in log_df.columns:
-                    ok_log = log_df[log_df["estado_ejecucion"].astype(str).str.startswith("ok")]
-                if not ok_log.empty:
-                    parsed_update = pd.to_datetime(
-                        ok_log["fecha_hora_ejecucion"].iloc[-1], errors="coerce"
-                    )
-                    if pd.notna(parsed_update):
-                        last_update = parsed_update.to_pydatetime()
-                        source = "log de actualización automática"
-        except Exception:
-            last_update = None
-
-    if last_update is None and DATA_PATH.exists():
-        last_update = datetime.fromtimestamp(DATA_PATH.stat().st_mtime)
-
-    if last_update is None and "fecha_emision" in df.columns:
-        latest_issue = pd.to_datetime(df["fecha_emision"], errors="coerce").max()
-        if pd.notna(latest_issue):
-            last_update = latest_issue.to_pydatetime()
-            source = "fecha máxima de emisión"
-
-    formatted_date = last_update.strftime("%d/%m/%Y %H:%M") if last_update else "Sin dato"
-    return {
-        "last_update": formatted_date,
-        "record_count": format_count(len(df)),
-        "source": source,
-    }
-
-
-def render_dataset_status(df: pd.DataFrame) -> None:
-    metadata = dataset_update_metadata(df)
-    st.markdown(
-        f"""
-        <div class="dataset-status">
-            <strong>Última actualización de datos:</strong> {metadata["last_update"]}
-            &nbsp;·&nbsp;
-            <strong>Registros simulados:</strong> {metadata["record_count"]}
-            &nbsp;·&nbsp;
-            Dataset ficticio generado automáticamente para fines de portfolio.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.caption(f"Fuente de actualización: {metadata['source']}.")
-
-
 def render_active_filter_banner() -> None:
     active = active_chart_filters()
     if not active:
@@ -963,14 +886,12 @@ def render_critical_invoices(df: pd.DataFrame) -> None:
     display_df = critical.copy()
     display_df["fecha_vencimiento"] = display_df["fecha_vencimiento"].dt.strftime("%d/%m/%Y")
     display_df["saldo_pendiente"] = display_df.apply(
-        lambda row: format_table_money(row["saldo_pendiente"], "US$")
+        lambda row: format_usd(row["saldo_pendiente"])
         if str(row["moneda"]).upper() == "USD"
-        else format_table_money(row["saldo_pendiente"]),
+        else format_ars(row["saldo_pendiente"]),
         axis=1,
     )
-    display_df["saldo_equivalente_ars"] = display_df["saldo_equivalente_ars"].map(
-        format_table_money
-    )
+    display_df["saldo_equivalente_ars"] = display_df["saldo_equivalente_ars"].map(format_ars)
     display_df["dias_atraso"] = display_df["dias_atraso"].fillna(0).astype(int)
 
     st.dataframe(
@@ -1084,21 +1005,6 @@ def render_client_profile(df: pd.DataFrame, client_name: str) -> None:
     display_detail = detail.copy()
     for column in ["fecha_emision", "fecha_vencimiento"]:
         display_detail[column] = display_detail[column].dt.strftime("%d/%m/%Y")
-    display_detail["importe_facturado"] = display_detail.apply(
-        lambda row: format_table_money(
-            row["importe_facturado"], "US$" if str(row["moneda"]).upper() == "USD" else "$"
-        ),
-        axis=1,
-    )
-    display_detail["saldo_pendiente"] = display_detail.apply(
-        lambda row: format_table_money(
-            row["saldo_pendiente"], "US$" if str(row["moneda"]).upper() == "USD" else "$"
-        ),
-        axis=1,
-    )
-    display_detail["saldo_equivalente_ars"] = display_detail["saldo_equivalente_ars"].map(
-        format_table_money
-    )
 
     st.dataframe(
         display_detail,
@@ -1109,9 +1015,9 @@ def render_client_profile(df: pd.DataFrame, client_name: str) -> None:
             "fecha_emision": st.column_config.TextColumn("Emisión"),
             "fecha_vencimiento": st.column_config.TextColumn("Vencimiento"),
             "moneda": st.column_config.TextColumn("Moneda"),
-            "importe_facturado": st.column_config.TextColumn("Facturado"),
-            "saldo_pendiente": st.column_config.TextColumn("Saldo origen"),
-            "saldo_equivalente_ars": st.column_config.TextColumn("Saldo ARS Eq"),
+            "importe_facturado": st.column_config.NumberColumn("Facturado", format="$ %.0f"),
+            "saldo_pendiente": st.column_config.NumberColumn("Saldo origen", format="$ %.0f"),
+            "saldo_equivalente_ars": st.column_config.NumberColumn("Saldo ARS Eq", format="$ %.0f"),
             "dias_atraso": st.column_config.NumberColumn("Días atraso", format="%d"),
             "estado": st.column_config.TextColumn("Estado"),
             "prioridad_cobranza": st.column_config.TextColumn("Prioridad"),
@@ -1143,7 +1049,8 @@ def render_clients_tab(df: pd.DataFrame) -> None:
     metrics = st.columns(3, gap="medium")
     metrics[0].metric("Clientes con deuda", format_count(clients_with_debt), border=True)
     metrics[1].metric(
-        f"Mayor saldo · {top_client['cliente']}",
+        "Mayor saldo",
+        top_client["cliente"],
         format_ars(top_client["saldo_pendiente_ars"]),
         border=True,
     )
@@ -1157,13 +1064,14 @@ def render_clients_tab(df: pd.DataFrame) -> None:
             y="cliente",
             x="saldo_pendiente_ars",
             orientation="h",
+            color="facturas_vencidas",
             labels={
                 "cliente": "",
                 "saldo_pendiente_ars": "Saldo pendiente ARS Eq",
                 "facturas_vencidas": "Vencidas",
             },
             custom_data=["cliente", "saldo_pendiente_ars", "facturas_vencidas"],
-            color_discrete_sequence=["#245b73"],
+            color_continuous_scale=["#dbe8ee", "#a43f3f"],
         )
         fig.update_traces(
             hovertemplate=(
@@ -1179,7 +1087,6 @@ def render_clients_tab(df: pd.DataFrame) -> None:
     with right:
         table = summary.copy()
         table["participacion_deuda"] = table["participacion_deuda"].map(lambda value: f"{value:.1%}")
-        table["saldo_pendiente_ars"] = table["saldo_pendiente_ars"].map(format_table_money)
         st.dataframe(
             table[["cliente", "facturas_vencidas", "saldo_pendiente_ars", "participacion_deuda"]],
             hide_index=True,
@@ -1188,7 +1095,7 @@ def render_clients_tab(df: pd.DataFrame) -> None:
             column_config={
                 "cliente": st.column_config.TextColumn("Cliente", width="medium"),
                 "facturas_vencidas": st.column_config.NumberColumn("Vencidas", format="%d", width="small"),
-                "saldo_pendiente_ars": st.column_config.TextColumn("Saldo", width="small"),
+                "saldo_pendiente_ars": st.column_config.NumberColumn("Saldo", format="$ %.0f", width="small"),
                 "participacion_deuda": st.column_config.TextColumn("% deuda", width="small"),
             },
         )
@@ -1210,23 +1117,6 @@ def render_project_note() -> None:
         "puede transformar una base de facturación y cobranzas en una herramienta ejecutiva "
         "de seguimiento. Permite identificar deuda pendiente, facturas vencidas, clientes "
         "críticos, exposición por moneda y acciones prioritarias de cobranza usando datos simulados."
-    )
-
-    st.markdown("### Trabajar desde otra PC")
-    st.write("Con Git y Python instalados, abrí una terminal y seguí estos pasos:")
-    st.code(
-        "git clone <URL_DEL_REPOSITORIO>\n"
-        "cd dashboard-cobranzas-streamlit\n"
-        "python -m venv .venv\n"
-        "# Windows: .venv\\Scripts\\activate\n"
-        "# macOS/Linux: source .venv/bin/activate\n"
-        "pip install -r requirements.txt\n"
-        "streamlit run app.py",
-        language="bash",
-    )
-    st.caption(
-        "Si el proyecto ya está clonado en esa PC, ejecutá `git pull` antes de iniciar. "
-        "El archivo de datos debe permanecer en `data/dataset_cobranzas.xlsx`."
     )
 
 
@@ -1264,8 +1154,6 @@ def main() -> None:
     if missing_optional:
         with st.expander("Columnas opcionales no encontradas o vacías", icon=":material/info:"):
             st.write(", ".join(missing_optional))
-
-    render_dataset_status(df)
 
     sidebar_filters = render_sidebar_filters(df)
     filtered = apply_filters(df, sidebar_filters)
