@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 import re
 import unicodedata
@@ -15,6 +15,7 @@ from openpyxl.utils.cell import range_boundaries
 APP_TITLE = "Dashboard de Cobranzas y Facturación para PyMEs"
 APP_SUBTITLE = "Seguimiento ejecutivo de facturación, cobranza, deuda pendiente y facturas críticas."
 DATA_PATH = Path("data") / "dataset_cobranzas.xlsx"
+UPDATE_LOG_PATH = Path("data") / "update_log.csv"
 
 EXPECTED_COLUMNS = [
     "id_factura",
@@ -159,6 +160,21 @@ st.markdown(
         padding: 0.38rem 0.68rem;
         font-size: 0.88rem;
         font-weight: 650;
+    }
+
+    .dataset-status {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 0.85rem 1rem;
+        margin: -0.35rem 0 1rem;
+        box-shadow: 0 3px 12px rgba(31, 41, 51, 0.04);
+        color: var(--muted);
+        font-size: 0.92rem;
+    }
+
+    .dataset-status strong {
+        color: var(--text);
     }
 
     .section-title {
@@ -628,6 +644,61 @@ def render_header() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def dataset_update_metadata(df: pd.DataFrame) -> dict[str, str]:
+    last_update: datetime | None = None
+    source = "fecha de modificación del Excel"
+
+    if UPDATE_LOG_PATH.exists():
+        try:
+            log_df = pd.read_csv(UPDATE_LOG_PATH)
+            if not log_df.empty and "fecha_hora_ejecucion" in log_df.columns:
+                ok_log = log_df
+                if "estado_ejecucion" in log_df.columns:
+                    ok_log = log_df[log_df["estado_ejecucion"].astype(str).str.startswith("ok")]
+                if not ok_log.empty:
+                    parsed_update = pd.to_datetime(
+                        ok_log["fecha_hora_ejecucion"].iloc[-1], errors="coerce"
+                    )
+                    if pd.notna(parsed_update):
+                        last_update = parsed_update.to_pydatetime()
+                        source = "log de actualización automática"
+        except Exception:
+            last_update = None
+
+    if last_update is None and DATA_PATH.exists():
+        last_update = datetime.fromtimestamp(DATA_PATH.stat().st_mtime)
+
+    if last_update is None and "fecha_emision" in df.columns:
+        latest_issue = pd.to_datetime(df["fecha_emision"], errors="coerce").max()
+        if pd.notna(latest_issue):
+            last_update = latest_issue.to_pydatetime()
+            source = "fecha máxima de emisión"
+
+    formatted_date = last_update.strftime("%d/%m/%Y %H:%M") if last_update else "Sin dato"
+    return {
+        "last_update": formatted_date,
+        "record_count": format_count(len(df)),
+        "source": source,
+    }
+
+
+def render_dataset_status(df: pd.DataFrame) -> None:
+    metadata = dataset_update_metadata(df)
+    st.markdown(
+        f"""
+        <div class="dataset-status">
+            <strong>Última actualización de datos:</strong> {metadata["last_update"]}
+            &nbsp;·&nbsp;
+            <strong>Registros simulados:</strong> {metadata["record_count"]}
+            &nbsp;·&nbsp;
+            Dataset ficticio generado automáticamente para fines de portfolio.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption(f"Fuente de actualización: {metadata['source']}.")
 
 
 def render_active_filter_banner() -> None:
@@ -1193,6 +1264,8 @@ def main() -> None:
     if missing_optional:
         with st.expander("Columnas opcionales no encontradas o vacías", icon=":material/info:"):
             st.write(", ".join(missing_optional))
+
+    render_dataset_status(df)
 
     sidebar_filters = render_sidebar_filters(df)
     filtered = apply_filters(df, sidebar_filters)

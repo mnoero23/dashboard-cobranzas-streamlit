@@ -49,11 +49,17 @@ La segunda iteración incorpora:
 
 ```text
 dashboard-cobranzas-streamlit/
+├── .github/
+│   └── workflows/
+│       └── update-dataset.yml
 ├── app.py
 ├── requirements.txt
 ├── README.md
+├── scripts/
+│   └── update_dataset.py
 └── data/
-    └── dataset_cobranzas.xlsx
+    ├── dataset_cobranzas.xlsx
+    └── update_log.csv
 ```
 
 ## Dataset simulado
@@ -65,6 +71,40 @@ data/dataset_cobranzas.xlsx
 ```
 
 La app intenta leer una hoja llamada `Facturas`. Si no existe, busca una tabla llamada `FacturasTable`.
+
+## Actualización automática del dataset
+
+Este proyecto incluye una rutina automática que genera facturas ficticias y actualiza la base de datos usada por la app. Esto permite que el dashboard se mantenga dinámico sin usar datos reales, APIs externas ni información de empresas reales.
+
+El script principal está en:
+
+```text
+scripts/update_dataset.py
+```
+
+La rutina:
+
+- Lee `data/dataset_cobranzas.xlsx`.
+- Usa la hoja `Facturas` y la tabla `FacturasTable` como fuente principal.
+- Reutiliza clientes y servicios existentes del Excel.
+- Agrega entre 3 y 8 facturas simuladas por ejecución.
+- Calcula fechas, saldos, estado, mora, prioridad y próxima acción.
+- Mantiene solo los últimos 12 meses móviles según `fecha_emision`.
+- Registra cada ejecución en `data/update_log.csv`.
+
+Para ejecutarla manualmente:
+
+```bash
+python scripts/update_dataset.py
+```
+
+La app muestra la fecha de última actualización, la cantidad total de registros simulados y la aclaración de que el dataset es ficticio para portfolio.
+
+### GitHub Actions
+
+El workflow `.github/workflows/update-dataset.yml` ejecuta la actualización una vez por día y también permite correrla manualmente desde la pestaña **Actions** de GitHub mediante `workflow_dispatch`.
+
+Cuando el Excel o el log cambian, el workflow hace commit y push automático al repositorio para que Streamlit Community Cloud vuelva a desplegar la app con datos simulados actualizados.
 
 ## KPIs incluidos
 
