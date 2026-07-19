@@ -115,7 +115,7 @@ st.markdown(
 
     .main .block-container {
         max-width: 1360px;
-        padding-top: 1.7rem;
+        padding-top: 0.65rem;
         padding-bottom: 2.8rem;
     }
 
@@ -123,15 +123,15 @@ st.markdown(
         background: linear-gradient(135deg, #ffffff 0%, #f5f8fb 100%);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 1.25rem 1.35rem 1.15rem;
+        padding: 0.9rem 1.1rem 0.85rem;
         box-shadow: var(--shadow);
-        margin-bottom: 1.1rem;
+        margin-bottom: 0.7rem;
     }
 
     .hero h1 {
-        margin: 0.25rem 0 0.35rem;
+        margin: 0.2rem 0 0.25rem;
         color: var(--text);
-        font-size: clamp(1.85rem, 2.5vw, 2.45rem);
+        font-size: clamp(1.55rem, 2vw, 2rem);
         line-height: 1.12;
         letter-spacing: 0;
     }
@@ -139,14 +139,7 @@ st.markdown(
     .hero p {
         margin: 0;
         color: var(--muted);
-        font-size: 1.02rem;
-    }
-
-    .badge-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.8rem;
+        font-size: 0.96rem;
     }
 
     .badge {
@@ -162,15 +155,41 @@ st.markdown(
         font-weight: 650;
     }
 
+    button[data-baseweb="tab"] {
+        background: #ffffff;
+        border: 1px solid var(--border-strong);
+        border-radius: 7px;
+        color: var(--muted);
+        font-weight: 750;
+        margin-right: 0.45rem;
+        padding: 0.45rem 0.75rem;
+        box-shadow: 0 3px 10px rgba(31, 41, 51, 0.04);
+    }
+
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #ffffff;
+    }
+
+    div[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
+        background: transparent;
+    }
+
+    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+        gap: 0.35rem;
+        margin-bottom: 0.75rem;
+    }
+
     .dataset-status {
         border: 1px solid var(--border);
         border-radius: 8px;
         background: #ffffff;
-        padding: 0.85rem 1rem;
-        margin: -0.35rem 0 1rem;
+        padding: 0.65rem 0.85rem;
+        margin: -0.25rem 0 0.6rem;
         box-shadow: 0 3px 12px rgba(31, 41, 51, 0.04);
         color: var(--muted);
-        font-size: 0.92rem;
+        font-size: 0.88rem;
     }
 
     .dataset-status strong {
@@ -246,6 +265,54 @@ st.markdown(
         border-radius: 8px;
         box-shadow: var(--shadow);
         background: var(--panel);
+    }
+
+    .client-separator {
+        border-top: 1px solid var(--border-strong);
+        margin: 1.15rem 0 0.95rem;
+    }
+
+    .client-analyze-title {
+        color: var(--text);
+        font-size: 1.2rem;
+        font-weight: 800;
+        margin-bottom: 0.35rem;
+    }
+
+    .client-kpi {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        box-sizing: border-box;
+        height: 124px;
+        padding: 0.95rem 1rem;
+    }
+
+    .client-kpi-label {
+        color: var(--muted);
+        font-size: 0.86rem;
+        font-weight: 750;
+        margin-bottom: 0.45rem;
+    }
+
+    .client-kpi-value {
+        color: var(--text);
+        font-size: 1.38rem;
+        font-weight: 800;
+        line-height: 1.15;
+    }
+
+    .value-green {
+        color: var(--success);
+    }
+
+    .value-orange {
+        color: var(--warning);
+    }
+
+    .value-red {
+        color: var(--danger);
     }
 
     .stDownloadButton button,
@@ -637,9 +704,6 @@ def render_header() -> None:
             <span class="badge">Dataset simulado · Caso de portfolio</span>
             <h1>{APP_TITLE}</h1>
             <p>{APP_SUBTITLE}</p>
-            <div class="badge-row">
-                <span class="badge">App interactiva desarrollada con Python, Streamlit, pandas y Plotly.</span>
-            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -699,6 +763,18 @@ def render_dataset_status(df: pd.DataFrame) -> None:
         unsafe_allow_html=True,
     )
     st.caption(f"Fuente de actualización: {metadata['source']}.")
+
+
+def render_client_kpi(label: str, value: str, color_class: str = "") -> None:
+    st.markdown(
+        f"""
+        <div class="client-kpi">
+            <div class="client-kpi-label">{label}</div>
+            <div class="client-kpi-value {color_class}">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_active_filter_banner() -> None:
@@ -1051,11 +1127,17 @@ def render_client_profile(df: pd.DataFrame, client_name: str) -> None:
     )
 
     st.markdown(f'<div class="section-title">Perfil de {client_name}</div>', unsafe_allow_html=True)
-    cols = st.columns(4, gap="medium")
-    cols[0].metric("Saldo pendiente", format_ars(kpis["saldo_pendiente_ars"]), border=True)
-    cols[1].metric("Saldo vencido", format_ars(kpis["saldo_vencido_ars"]), border=True)
-    cols[2].metric("Facturas vencidas", format_count(kpis["facturas_vencidas"]), border=True)
-    cols[3].metric("Facturas totales", format_count(len(client_df)), border=True)
+    cols = st.columns(5, gap="medium")
+    with cols[0]:
+        render_client_kpi("Total facturado", format_ars(kpis["total_facturado_ars"]), "value-green")
+    with cols[1]:
+        render_client_kpi("Saldo pendiente", format_ars(kpis["saldo_pendiente_ars"]), "value-orange")
+    with cols[2]:
+        render_client_kpi("Saldo vencido", format_ars(kpis["saldo_vencido_ars"]), "value-red")
+    with cols[3]:
+        render_client_kpi("Facturas vencidas", format_count(kpis["facturas_vencidas"]), "value-red")
+    with cols[4]:
+        render_client_kpi("Facturas totales", format_count(len(client_df)))
 
     info_cols = st.columns(3, gap="medium")
     info_cols[0].caption("Tipo de cliente")
@@ -1194,11 +1276,14 @@ def render_clients_tab(df: pd.DataFrame) -> None:
         )
 
     client_options = sorted(summary["cliente"].tolist(), key=str.casefold)
+    st.markdown('<div class="client-separator"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="client-analyze-title">Analizar cliente</div>', unsafe_allow_html=True)
     selected_client = st.selectbox(
         "Analizar cliente",
         client_options,
         index=0,
         placeholder="Seleccioná un cliente",
+        label_visibility="collapsed",
     )
     render_client_profile(df, selected_client)
 
